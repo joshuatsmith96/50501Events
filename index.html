@@ -1,0 +1,381 @@
+<style>
+    .eventsContainer {
+        font-family: Arial, sans-serif !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    #loadingSpinner {
+        border: 6px solid #f3f3f3 !important;
+        border-top: 6px solid #0073aa !important;
+        border-radius: 50% !important;
+        width: 40px !important;
+        height: 40px !important;
+        animation: spin 1s linear infinite !important;
+        margin: 2rem auto !important;
+        display: none !important;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg) !important;
+        }
+
+        100% {
+            transform: rotate(360deg) !important;
+        }
+    }
+
+    .allEventsContainer {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 1rem !important;
+        padding: 1rem !important;
+        justify-content: center !important;
+    }
+
+    .eventCard {
+        border: 1px solid #ccc !important;
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        width: 300px !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+        background: white !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+    }
+
+    .eventImage {
+        width: 100% !important;
+        height: 160px !important;
+        background-size: cover !important;
+        background-position: center !important;
+        border-radius: 8px !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .eventTitle {
+        font-size: 1.25rem !important;
+        font-weight: bold !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .eventDetails {
+        font-size: 0.9rem !important;
+        margin-bottom: 0.5rem !important;
+        color: #444 !important;
+    }
+
+    .filters{
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .selector{
+        display: flex;
+        flex-direction: column;
+        justify-content: start;
+        align-items: start;
+    }
+
+    .moreBtn {
+        margin-top: auto !important;
+        padding: 0.5rem 1rem !important;
+        background: #0073aa !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        text-decoration: none !important;
+        text-align: center !important;
+    }
+
+    .moreBtn:hover {
+        background: #005f8d !important;
+    }
+
+    .pagination {
+        display: flex !important;
+        justify-content: center !important;
+        gap: 1rem !important;
+        margin-top: 2rem !important;
+    }
+
+    .pagination button {
+        padding: 0.5rem 1rem !important;
+        background: #0073aa !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+    }
+
+    .pagination button:hover {
+        background: #005f8d !important;
+    }
+
+    .pagination .disabled {
+        background: #ccc !important;
+        cursor: not-allowed !important;
+    }
+
+    .paginationInfo {
+        text-align: center !important;
+        margin-top: 1rem !important;
+        margin-bottom: 10px !important;
+    }
+
+    .searchBar {
+        text-align: center !important;
+        padding: 1rem !important;
+        display: block;
+    }
+
+    .searchBar input,
+    .searchBar select {
+        padding: 0.5rem 1rem !important;
+        border-radius: 6px !important;
+        border: 1px solid #ccc !important;
+        margin-top: 0.5rem !important;
+        width: 275px !important;
+    }
+
+    .searchBar input {
+        padding: .75rem !important;
+    }
+</style>
+
+<div class="events">
+
+    <div class="eventsContainer">
+
+        <div class="searchBar">
+            <input type="text" id="searchInput" placeholder="Search events by name, location, or type..." />
+            <br><br>
+            <div class="filters">
+                <div class="selector">
+                    <label for="dateFilter">Date:</label>
+                    <select id="dateFilter">
+                        <option value="all">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="this-week">This Week</option>
+                        <option value="this-month">This Month</option>
+                    </select>
+                </div>
+                <div class="selector">
+                    <label for="typeFilter">Type:</label>
+                    <select id="typeFilter">
+                        <option value="all">All Types</option>
+                        <option value="Rally">Rally</option>
+                        <option value="Protest">Protest</option>
+                        <option value="Town Hall">Town Hall</option>
+                        <option value="Community Builder">Community Builder</option>
+                        <option value="Educational Opportunity">Educational Opportunity</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingSpinner"></div>
+
+        <div class="allEventsContainer"></div>
+
+        <div class="pagination">
+            <button id="prevBtn" class="disabled" disabled>Previous</button>
+            <button id="nextBtn">Next</button>
+        </div>
+
+        <div class="paginationInfo">
+            <span id="paginationInfo">Page 1 of 1</span>
+        </div>
+
+    </div>
+</div>
+
+<script>
+        const eventsPerPage = 12;
+        let currentPage = 1;
+        let eventsData = [];
+        let filteredEvents = [];
+
+        async function fetchSheetData() {
+            const sheetId = "1ItquUmluhefx_bS-Yyoz9quQtg71ni4Urz23Q1KWq4M";
+            const sheetName = "EVENTS";
+            const url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
+            const spinner = document.getElementById('loadingSpinner');
+
+            try {
+                spinner.style.display = 'block';
+                const response = await fetch(url);
+                const data = await response.json();
+
+                eventsData = data.filter(event => {
+                    const hasName = event.Name && event.Name.trim() !== '';
+                    const eventDate = event.Date ? new Date(event.Date) : null;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    const isFutureEvent = eventDate && eventDate >= today;
+                    return hasName && isFutureEvent;
+                });
+
+                console.log(eventsData)
+
+                filteredEvents = [...eventsData];
+                renderEvents();
+            } catch (error) {
+                console.error("Error fetching the sheet data:", error);
+                eventsData = [];
+                filteredEvents = [];
+                renderEvents();
+            } finally {
+                spinner.style.display = 'none';
+            }
+        }
+
+        function filterEvents() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            const dateFilter = document.getElementById('dateFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            filteredEvents = eventsData.filter(event => {
+                const nameMatch = event.Name && event.Name.toLowerCase().includes(searchTerm);
+                const locationMatch = event.Location && event.Location.toLowerCase().includes(searchTerm);
+                const typeMatch = event.Type && event.Type.toLowerCase().includes(searchTerm);
+                const matchesSearch = nameMatch || locationMatch || typeMatch;
+
+                // Date filtering
+                let matchesDate = true;
+                if (event.Date) {
+                    const eventDate = new Date(event.Date);
+                    eventDate.setHours(0, 0, 0, 0);
+
+                    if (dateFilter === 'today') {
+                        matchesDate = eventDate.getTime() === now.getTime();
+                    } else if (dateFilter === 'this-week') {
+                        const weekFromNow = new Date(now);
+                        weekFromNow.setDate(weekFromNow.getDate() + 7);
+                        matchesDate = eventDate >= now && eventDate <= weekFromNow;
+                    } else if (dateFilter === 'this-month') {
+                        matchesDate = eventDate.getMonth() === now.getMonth() &&
+                            eventDate.getFullYear() === now.getFullYear();
+                    }
+                }
+
+                const matchesType = (typeFilter === 'all') ||
+                    (event.Type && event.Type.toLowerCase() === typeFilter.toLowerCase());
+
+                return matchesSearch && matchesDate && matchesType;
+            });
+
+            currentPage = 1;
+            renderEvents();
+        }
+
+        function renderEvents() {
+            const eventsContainer = document.querySelector('.allEventsContainer');
+            const startIndex = (currentPage - 1) * eventsPerPage;
+            const endIndex = startIndex + eventsPerPage;
+            const eventsToDisplay = filteredEvents.slice(startIndex, endIndex);
+
+            eventsContainer.innerHTML = "";
+
+            if (eventsToDisplay.length === 0) {
+                eventsContainer.innerHTML = "<p>No events found.</p>";
+            }
+
+            eventsToDisplay.forEach(event => {
+                const card = document.createElement('div');
+                card.classList.add('eventCard');
+
+                const eventImage = document.createElement('div');
+                eventImage.classList.add('eventImage');
+                eventImage.style.backgroundImage = `url('https://i0.wp.com/port2flavors.com/wp-content/uploads/2022/07/placeholder-614.png')`;
+
+                const eventTitle = document.createElement('div');
+                eventTitle.classList.add('eventTitle');
+                eventTitle.textContent = event.Name;
+
+                const eventDetails = document.createElement('div');
+                eventDetails.classList.add('eventDetails');
+                eventDetails.innerHTML = `
+                <strong>Location:</strong> ${event.Location || "TBA"} <br>
+                <strong>Date:</strong> ${event.Date || "TBA"} <br>
+                <strong>Time:</strong> ${event["Start Time"] || ""} - ${event["End Time"] || ""} <br>
+                <strong>Type:</strong> ${event.Type || "TBA"} <br>
+            `;
+
+                const moreBtn = document.createElement('a');
+                moreBtn.classList.add('moreBtn');
+                console.log(event)
+
+                if (event.Link && event.Link.trim() !== "") {
+                    let link = event.Link.trim();
+                    if (!/^https?:\/\//i.test(link)) {
+                        link = 'https://' + link;
+                    }
+                    moreBtn.href = link;
+                    moreBtn.target = '_blank';
+                    moreBtn.textContent = "More Info";
+                } else {
+                    moreBtn.href = "#";
+                    moreBtn.classList.add('disabled');
+                    moreBtn.style.pointerEvents = 'none';
+                    moreBtn.style.background = '#aaa';
+                    moreBtn.textContent = "No Link";
+                }
+
+                card.appendChild(eventImage);
+                card.appendChild(eventTitle);
+                card.appendChild(eventDetails);
+                card.appendChild(moreBtn);
+
+                eventsContainer.appendChild(card);
+            });
+
+            updatePagination();
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
+
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.classList.toggle('disabled', currentPage === 1);
+
+            nextBtn.disabled = currentPage >= totalPages;
+            nextBtn.classList.toggle('disabled', currentPage >= totalPages);
+
+            document.getElementById('paginationInfo').textContent = `Page ${currentPage} of ${totalPages || 1}`;
+        }
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderEvents();
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderEvents();
+            }
+        });
+
+        document.getElementById('searchInput').addEventListener('input', filterEvents);
+        document.getElementById('dateFilter').addEventListener('change', filterEvents);
+        document.getElementById('typeFilter').addEventListener('change', filterEvents);
+
+        fetchSheetData();
+    </script>
